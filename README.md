@@ -1,4 +1,8 @@
 # stock_data_analysis
+#股票数据分析
+1.股票数据爬虫
+2.pandas,numpy对数据进行清洗
+3.matplotlib数据可视化
 stockinfo.py
 设计爬虫项目从网易财经获取股票数据
 
