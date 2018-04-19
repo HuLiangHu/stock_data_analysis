@@ -107,7 +107,7 @@ def get_forecast(data):
             ax.plot(data['Forecast'])
             plt.legend()
             #plt.show()
-
+            print('正在打印'+e.split('\\')[3].split('.')[0])
             plt.savefig(str('D:\\stock_data\\stock_trend_chart\\'+e.split('\\')[3].split('.')[0]))
             #plt.show()
         except ValueError:
