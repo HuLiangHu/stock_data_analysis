@@ -6,6 +6,7 @@ import os
 import time
 import warnings
 from sklearn.cross_validation import train_test_split
+warnings.filterwarnings("ignore")
 from sklearn import  preprocessing
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
@@ -14,22 +15,11 @@ from matplotlib.dates import  date2num
 from pylab import mpl
 import copy
 import pandas
-warnings.filterwarnings("ignore")
+import math
 
 
-# 将日期转成数字,再将t,open,highs,lows,close放到series
-def date_to_num(stock):
-    stock_list = []
-    for dates in stock['日期']:
-        # 将时间转换为数字
-        date_time = datetime.datetime.strptime(dates, '%Y-%m-%d')
-        t = date2num(date_time)
-        stock_list.append(t)
-    arr2 = np.array(stock_list)
-    # 将数据转成series,再用candlestick_ohlc()函数画出K线图
-    stock_array = np.array(stock.reset_index()[['日期', '开盘价', '最高价', '最低价', '收盘价']])
-    stock_array[:, 0] = copy.copy(arr2)
-    return stock_array
+
+
 
 def get_forecast(data):
     mpl.rcParams['font.sans-serif'] = ['SimHei']#解决中文乱码问题
@@ -41,21 +31,34 @@ def get_forecast(data):
 
     #data['收盘价'].plot()
     del data['名称']
-
-    # 构造预测指标
     forecast_col = '收盘价'
     data.fillna(-99999, inplace=True)
-    forecast_out = 7  # forecast_out = int(math.ceil(0.01 * len(df)))  # math.ceil：返回大于等于数字参数的最小整数(取整函数)
+    forecast_out = 5
+    #forecast_out = int(math.ceil(0.01 * len(data)))  # math.ceil：返回大于等于数字参数的最小整数(取整函数)
     data['label'] = data[forecast_col].shift(-forecast_out)  # shift函数是对数据进行移动的操作,此处是将股票收盘价向前移动forecast_out个位置，然后作为标签
+    data = data[data.index > '2018-01-01']
 
-    #特征指标数据缩放，预测数据分割
+
+    try:
+        # 将最后一条数据的日期转化为时间戳
+
+        last_date = data.iloc[-1].name
+        last_unix = time.strptime(last_date, '%Y-%m-%d')
+        last_unix = time.mktime(last_unix)
+
+        #last_unix = last_date.timestamp()
+        #last_unix = time.mktime(last_date.timetuple())
+        one_day = 86400
+        next_unix = last_unix + one_day
+    except IndexError:
+        pass
     X = np.array(data.drop(['label'], 1))  # 对于DataFrame，可以从任何坐标轴删除索引值：
     try:
         X = preprocessing.scale(X)  # 数据缩放的算法
         X = X[:-forecast_out]
         X_lately = X[-forecast_out:]
-        data.dropna(inplace=True)
-        y = np.array(data['label'])#按行丢弃带有nan的数据
+        data.dropna(inplace=True)#可以按行丢弃带有nan的数据
+        y = np.array(data['label'])
     except ValueError:
         pass
 
@@ -70,19 +73,23 @@ def get_forecast(data):
         clf.fit(X_train, y_train)
         accuracy = clf.score(X_test, y_test)
         forecast_set = clf.predict(X_lately)
-        data['Forecast'] = np.nan
+
+        data['预测'] = np.nan
     except UnboundLocalError:
         pass
     try:
         # 将最后一条数据的日期转化为时间戳
-        last_date = data.iloc[-1].name
-        last_unix = time.strptime(last_date, '%Y-%m-%d')
-        last_unix = time.mktime(last_unix)
 
-        #last_unix = last_date.timestamp()
-        #last_unix = time.mktime(last_date.timetuple())
-        one_day = 86400
-        next_unix = last_unix + one_day
+        try:
+            last_unix = time.strptime(last_date, '%Y-%m-%d')
+            last_unix = time.mktime(last_unix)
+
+            #last_unix = last_date.timestamp()
+            #last_unix = time.mktime(last_date.timetuple())
+            one_day = 86400
+            next_unix = last_unix + one_day
+        except UnboundLocalError:
+            pass
     except IndexError:
         pass
     try:
@@ -98,17 +105,19 @@ def get_forecast(data):
             #print(data)
             #exit()
             fig, ax = plt.subplots()
-            ax.set_title(stock['名称'][0][:10] + '收盘走势', fontsize=17)
-            ax.set_xlabel("时间",fontsize=10)
-            ax.set_ylabel("股价（元）",fontsize=10)
-            ax.set_xticks(range(1, len(data), 2))
-            ax.set_xticklabels(data.index[0:len(data):2], rotation=30)
-            ax.plot(data['收盘价'])
-            ax.plot(data['Forecast'])
+            ax.set_title(stocks['名称'][0][:10] + '预测收盘走势', fontsize=17)
+            plt.xlabel("时间")
+            ax.set_ylabel("股价（元）")
+
+            data['收盘价'].plot()
+            data['预测'].plot()
+
             plt.legend()
+            plt.xlabel('Date')
+            plt.ylabel('Price')
             #plt.show()
             print('正在打印'+e.split('\\')[3].split('.')[0])
-            plt.savefig(str('D:\\stock_data\\stock_trend_chart\\'+e.split('\\')[3].split('.')[0]))
+            plt.savefig(str('E:\\stock_data\\stock_trend_chart\\'+e.split('\\')[3].split('.')[0]))
             #plt.show()
         except ValueError:
             pass
@@ -127,18 +136,21 @@ if __name__ == '__main__':
                 GetFileList(newDir, fileList)
         return fileList
 
-    list = GetFileList('D:\\stock_data\\stockinfo', [])
+    list = GetFileList('E:\\stock_data\\stockinfo', [])
     # 循环遍历路径列表,读取每个csv文件内容,将stockcode传入pandas_candlestick_ohlc函数里
     for e in list:  # e返回的文件名
         try:
             df = pd.read_csv(e, encoding='gbk')
         except pandas.errors.EmptyDataError:
             pass
-        stocks = df.loc[:, ['日期', '名称', '开盘价', '最高价', '收盘价', '最低价', '成交量']]
-        stock = stocks[stocks['日期'] > '2018-01-01']
 
-        data = stock.set_index('日期')
+        stocks = df.loc[:, ['日期', '名称', '开盘价', '最高价', '收盘价', '最低价', '成交量']]
+        #stock = stocks[stocks['日期'] > '2018-01-01']
+
+        data = stocks.set_index('日期')
         data = data[::-1]
 
-        get_forecast(data)
-        #exit()
+        if data.empty:#判断DataFrame是否为空，即是否有数据，有数据就画图，没有就忽略
+            pass
+        else:
+            get_forecast(data)
